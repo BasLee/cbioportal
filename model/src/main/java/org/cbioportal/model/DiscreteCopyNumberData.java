@@ -4,7 +4,7 @@ import java.io.Serializable;
 import javax.validation.constraints.NotNull;
 
 public class DiscreteCopyNumberData extends Alteration implements Serializable {
-    
+    // TODO: add annotationJSON
     @NotNull
     private Integer alteration;
     

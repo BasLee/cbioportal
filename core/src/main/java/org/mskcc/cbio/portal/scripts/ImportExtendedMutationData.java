@@ -60,7 +60,7 @@ import java.util.regex.*;
  * @author Selcuk Onur Sumer
  */
 public class ImportExtendedMutationData{
-
+    // TODO: alter
     private File mutationFile;
     private int geneticProfileId;
     private boolean swissprotIsAccession;

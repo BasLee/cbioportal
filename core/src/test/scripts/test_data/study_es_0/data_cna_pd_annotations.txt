@@ -1,8 +1,8 @@
-SAMPLE_ID	Entrez_Gene_Id	cbp_driver	cbp_driver_annotation	cbp_driver_tiers	cbp_driver_tiers_annotation
-TCGA-A2-A04U-01	116983	Putative_Passenger	Test passenger	Class 2	Class annotation
-TCGA-A2-A04U-01	375790	Putative_Driver	Test driver	Class 1	Class annotation
-TCGA-A2-A04U-01	219293	Putative_Passenger	Test passenger		
-TCGA-A2-A04U-01	2073	Putative_Driver	Test driver		
-TCGA-A7-A26F-01	55210			Class 2	Class annotation
-TCGA-A7-A26F-01	83858			Class 1	Class annotation
-TCGA-A7-A26F-01	2073	Putative_Driver			
+SAMPLE_ID	Entrez_Gene_Id	cbp_driver	cbp_driver_annotation	cbp_driver_tiers	cbp_driver_tiers_annotation	CustomNamespace2.column1	CustomNamespace2.column2
+TCGA-A2-A04U-01	116983	Putative_Passenger	Test passenger	Class 2	Class annotation	1	a
+TCGA-A2-A04U-01	375790	Putative_Driver	Test driver	Class 1	Class annotation	2	b
+TCGA-A2-A04U-01	219293	Putative_Passenger	Test passenger			3	c
+TCGA-A2-A04U-01	2073	Putative_Driver	Test driver			4	d
+TCGA-A7-A26F-01	55210			Class 2	Class annotation	5	e
+TCGA-A7-A26F-01	83858			Class 1	Class annotation	6	f
+TCGA-A7-A26F-01	2073	Putative_Driver				7	g

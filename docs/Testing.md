@@ -32,7 +32,7 @@ mysql -u root -p
 SET GLOBAL local_infile=1;
 CREATE DATABASE cgds_test;
 CREATE USER 'cbio_user'@'localhost' IDENTIFIED BY 'somepassword';
-GRANT ALL ON cgds_test.* TO 'cbio_user'@'localhost'";
+GRANT ALL ON cgds_test.* TO 'cbio_user'@'localhost';
 FLUSH PRIVILEGES;
 SET default_storage_engine=InnoDB;
 SET SESSION sql_mode = 'ANSI_QUOTES';
@@ -92,7 +92,7 @@ SET SESSION sql_mode = 'ANSI_QUOTES';
 2. Run integration tests with
 
 ```
-mvn integration-test -Ddb.test.username=cbio -Ddb.test.password=<your_db_password>
+mvn integration-test -Ddb.test.username=cbio_user -Ddb.test.password=somepassword
 ```
 
 This will create the tables in `cgds_test` and populate your schema with test data.
@@ -100,7 +100,7 @@ This will create the tables in `cgds_test` and populate your schema with test da
 3. you can run all other tests with
 
 ```
-mvn test -Ddb.test.username=cbio -Ddb.test.password=<your_db_password>
+mvn test -Ddb.test.username=cbio_user -Ddb.test.password=somepassword
 ```
 
 4. you can run a specific test with
