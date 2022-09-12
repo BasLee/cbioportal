@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.cbioportal.model.CopyNumberCount;
 import org.cbioportal.model.DiscreteCopyNumberData;
 import org.cbioportal.model.Gene;
-import org.cbioportal.model.ReferenceGenomeGene;
 import org.cbioportal.model.meta.BaseMeta;
 import org.cbioportal.service.DiscreteCopyNumberService;
 import org.cbioportal.web.parameter.CopyNumberCountIdentifier;
@@ -42,6 +41,7 @@ public class DiscreteCopyNumberControllerTest {
     private static final String TEST_SAMPLE_STABLE_ID_1 = "test_sample_stable_id_1";
     private static final int TEST_ENTREZ_GENE_ID_1 = 1;
     private static final int TEST_ALTERATION_1 = 1;
+    private static final String TEST_ANNOTATION_JSON_1 = "{\"columnName\":{\"fieldName\":\"fieldValue\"}}";
     private static final String TEST_HUGO_GENE_SYMBOL_1 = "test_hugo_gene_symbol_1";
     private static final String TEST_TYPE_1 = "test_type_1";
     private static final String TEST_CYTOBAND_1 = "test_cytoband_1";
@@ -103,6 +103,7 @@ public class DiscreteCopyNumberControllerTest {
             .andExpect(MockMvcResultMatchers.jsonPath("$[0].sampleId").value(TEST_SAMPLE_STABLE_ID_1))
             .andExpect(MockMvcResultMatchers.jsonPath("$[0].entrezGeneId").value(TEST_ENTREZ_GENE_ID_1))
             .andExpect(MockMvcResultMatchers.jsonPath("$[0].alteration").value(TEST_ALTERATION_1))
+            .andExpect(MockMvcResultMatchers.jsonPath("$[0].namespaceColumns.columnName.fieldName").value("fieldValue"))
             .andExpect(MockMvcResultMatchers.jsonPath("$[0].gene").doesNotExist())
             .andExpect(MockMvcResultMatchers.jsonPath("$[1].molecularProfileId")
                 .value(TEST_MOLECULAR_PROFILE_STABLE_ID_2))
@@ -340,6 +341,7 @@ public class DiscreteCopyNumberControllerTest {
         discreteCopyNumberData1.setEntrezGeneId(TEST_ENTREZ_GENE_ID_1);
         discreteCopyNumberData1.setAlteration(TEST_ALTERATION_1);
         discreteCopyNumberDataList.add(discreteCopyNumberData1);
+        discreteCopyNumberData1.setAnnotationJson(TEST_ANNOTATION_JSON_1);
         DiscreteCopyNumberData discreteCopyNumberData2 = new DiscreteCopyNumberData();
         discreteCopyNumberData2.setMolecularProfileId(TEST_MOLECULAR_PROFILE_STABLE_ID_2);
         discreteCopyNumberData2.setSampleId(TEST_SAMPLE_STABLE_ID_2);
