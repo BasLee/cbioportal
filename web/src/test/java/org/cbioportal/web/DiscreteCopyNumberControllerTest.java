@@ -111,6 +111,24 @@ public class DiscreteCopyNumberControllerTest {
             .andExpect(MockMvcResultMatchers.jsonPath("$[1].entrezGeneId").value(TEST_ENTREZ_GENE_ID_2))
             .andExpect(MockMvcResultMatchers.jsonPath("$[1].alteration").value(TEST_ALTERATION_2))
             .andExpect(MockMvcResultMatchers.jsonPath("$[1].gene").doesNotExist());
+    }    
+    @Test
+    public void getDiscreteCopyNumbersWithoutAnnotationJson() throws Exception {
+
+        List<DiscreteCopyNumberData> discreteCopyNumberDataList = createExampleDiscreteCopyNumberData();
+        discreteCopyNumberDataList.get(0).setAnnotationJson(null);
+        Mockito.when(discreteCopyNumberService.getDiscreteCopyNumbersInMolecularProfileBySampleListId(
+            Mockito.any(), Mockito.any(), Mockito.any(),
+            Mockito.any(), Mockito.any())).thenReturn(discreteCopyNumberDataList);
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/molecular-profiles/test_molecular_profile_id/discrete-copy-number")
+            .param("sampleListId", TEST_SAMPLE_LIST_ID)
+            .param("discreteCopyNumberEventType", DiscreteCopyNumberEventType.HOMDEL_AND_AMP.name())
+            .accept(MediaType.APPLICATION_JSON))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andExpect(MockMvcResultMatchers.content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(MockMvcResultMatchers.jsonPath("$", Matchers.hasSize(2)))
+            .andExpect(MockMvcResultMatchers.jsonPath("$[0].namespaceColumns").doesNotExist());
     }
 
     @Test
