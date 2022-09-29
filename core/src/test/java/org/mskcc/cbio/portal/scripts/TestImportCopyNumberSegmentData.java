@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ */
 
 package org.mskcc.cbio.portal.scripts;
 
@@ -54,53 +54,53 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Test the import of Segment data into database.
+ *
  * @author pieterlukasse
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
+@ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
 @Rollback
 @Transactional
 public class TestImportCopyNumberSegmentData {
 
-	@Autowired
-	ApplicationContext applicationContext;
-	
-	//To use in test cases where we expect an exception:
-	@Rule
-	public ExpectedException exception = ExpectedException.none();
-    
-	
-	@Before 
-	public void setUp() throws DaoException
-	{
-		//set it, to avoid this being set to the runtime (not for testing) application context:
-		SpringUtil.setApplicationContext(applicationContext);
-	}
-	
-	/**
+    @Autowired
+    ApplicationContext applicationContext;
+
+    //To use in test cases where we expect an exception:
+    @Rule
+    public ExpectedException exception = ExpectedException.none();
+
+
+    @Before
+    public void setUp() throws DaoException {
+        //set it, to avoid this being set to the runtime (not for testing) application context:
+        SpringUtil.setApplicationContext(applicationContext);
+    }
+
+    /**
      * Test importing of Clinical Data File.
      *
      * @throws DaoException Database Access Error.
      * @throws IOException  IO Error.
      */
-	@Test
+    @Test
     public void testImportSegmentDataNewStudy() throws Exception {
-		//new dummy study to simulate importing clinical data in empty study:
-		CancerStudy cancerStudy = new CancerStudy("testnewseg","testnewseg","testnewseg","brca",true);
+        //new dummy study to simulate importing clinical data in empty study:
+        CancerStudy cancerStudy = new CancerStudy("testnewseg", "testnewseg", "testnewseg", "brca", true);
         cancerStudy.setReferenceGenome("hg19");
-		DaoCancerStudy.addCancerStudy(cancerStudy);
+        DaoCancerStudy.addCancerStudy(cancerStudy);
         addTestPatientAndSampleRecords(new File("src/test/resources/segment/data_cna_hg19.seg"), cancerStudy);
 
         String[] args = {
-        		"--data","src/test/resources/segment/data_cna_hg19.seg",
-        		"--meta","src/test/resources/segment/meta_cna_hg19_seg.txt",
-        		"--loadMode", "bulkLoad"
-        		};
+            "--data", "src/test/resources/segment/data_cna_hg19.seg",
+            "--meta", "src/test/resources/segment/meta_cna_hg19_seg.txt",
+            "--loadMode", "bulkLoad"
+        };
         ImportCopyNumberSegmentData runner = new ImportCopyNumberSegmentData(args);
-        runner.run(); 
+        runner.run();
         //TODO : fix test to actually store data and add some checks 
-       
-	}
+
+    }
 
     private void addTestPatientAndSampleRecords(File file, CancerStudy cancerStudy) throws FileNotFoundException, IOException, DaoException {
         // extract sample ids from first column
@@ -108,7 +108,7 @@ public class TestImportCopyNumberSegmentData {
         BufferedReader buf = new BufferedReader(reader);
         String line = buf.readLine(); // want to skip first line / header line
         List<String> sampleIds = new ArrayList<>();
-        while ((line=buf.readLine()) != null) {
+        while ((line = buf.readLine()) != null) {
             String[] parts = line.split("\t");
             if (!sampleIds.contains(parts[0])) {
                 sampleIds.add(parts[0]);

@@ -59,8 +59,10 @@ import java.util.regex.*;
  * <br>
  * @author Selcuk Onur Sumer
  */
+
+// TODO: example voor pd en namespaces
+
 public class ImportExtendedMutationData{
-    // TODO: alter
     private File mutationFile;
     private int geneticProfileId;
     private boolean swissprotIsAccession;

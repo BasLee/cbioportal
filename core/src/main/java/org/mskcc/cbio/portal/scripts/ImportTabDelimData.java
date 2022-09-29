@@ -60,7 +60,7 @@ public class ImportTabDelimData {
     public static final String CNA_VALUE_HOMOZYGOUS_DELETION = "-2";
     public static final String CNA_VALUE_PARTIAL_DELETION = "-1.5";
     public static final String CNA_VALUE_ZERO = "0";
-    private HashSet<Long> importSetOfGenes = new HashSet<Long>();
+    private GeneticAlterationGeneImporter geneticAlterationGeneImporter;
     private HashSet<Integer> importedGeneticEntitySet = new HashSet<>(); 
     private File dataFile;
     private String targetLine;
@@ -73,6 +73,9 @@ public class ImportTabDelimData {
     private String genericEntityProperties;
     private File pdAnnotationsFile;
     private Map<Map.Entry<Integer, Long>, Map<String, String>> pdAnnotations;
+    //Object to insert records in the generic 'genetic_alteration' table: 
+    private DaoGeneticAlteration daoGeneticAlteration;
+
 
     /**
      * Constructor.
@@ -86,12 +89,20 @@ public class ImportTabDelimData {
      * 
      * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)? 
      */
-    public ImportTabDelimData(File dataFile, String targetLine, int geneticProfileId, String genePanel, String genericEntityProperties) {
+    public ImportTabDelimData(
+        File dataFile, 
+        String targetLine, 
+        int geneticProfileId, 
+        String genePanel, 
+        String genericEntityProperties
+    ) throws Exception {
         this.dataFile = dataFile;
         this.targetLine = targetLine;
         this.geneticProfileId = geneticProfileId;
         this.genePanel = genePanel;
         this.genericEntityProperties = genericEntityProperties;
+        this.daoGeneticAlteration = DaoGeneticAlteration.getInstance();
+        this.geneticAlterationGeneImporter = new GeneticAlterationGeneImporter(geneticProfileId, daoGeneticAlteration);
     }
 
     /**
@@ -189,8 +200,9 @@ public class ImportTabDelimData {
                 pdAnnotationsForStableSampleIds = readPdAnnotations(this.pdAnnotationsFile);
             }
             // link Samples to the genetic profile
-            ArrayList <Integer> orderedSampleList = new ArrayList<Integer>();
-            ArrayList <Integer> filteredSampleIndices = new ArrayList<Integer>();
+            ArrayList <Integer> orderedSampleList = new ArrayList<>();
+            ArrayList <Integer> filteredSampleIndices = new ArrayList<>();
+            
             this.pdAnnotations = new HashMap<>();
             for (int i = 0; i < sampleIds.length; i++) {
                 Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(geneticProfile.getCancerStudyId(),
@@ -238,9 +250,6 @@ public class ImportTabDelimData {
     
             //Gene cache:
             DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
-    
-            //Object to insert records in the generic 'genetic_alteration' table: 
-            DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
     
             //cache for data found in  cna_event' table:
             Map<CnaEvent.Event, CnaEvent.Event> existingCnaEvents = null;            
@@ -473,7 +482,6 @@ public class ImportTabDelimData {
     * @param  isRppaProfile               true if this is an rppa profile (i.e. alteration type is PROTEIN_LEVEL and the first column is Composite.Element.Ref)
     * @param  isDiscretizedCnaProfile     true if this is a discretized CNA profile (i.e. alteration type COPY_NUMBER_ALTERATION and showProfileInAnalysisTab is true)
     * @param  daoGene                   an instance of DaoGeneOptimized ... for use in resolving gene symbols
-    * @param  filteredSampleIndicesList not used (dead code)
     * @param  orderedSampleList         a list of the internal sample ids corresponding to the sample names in the header line
     * @param  existingCnaEvents         a collection of CnaEvents, to be added to or updated during parsing of individual lines
     * @param  daoGeneticAlteration      in instance of DaoGeneticAlteration ... for use in storing records in the genetic_alteration table
@@ -503,7 +511,7 @@ public class ImportTabDelimData {
                     return false;
                 }
             }
-            String values[] = (String[]) ArrayUtils.subarray(parts, sampleStartIndex, parts.length>nrColumns?nrColumns:parts.length);
+            String values[] = (String[]) ArrayUtils.subarray(parts, sampleStartIndex, parts.length > nrColumns ? nrColumns : parts.length);
             values = filterOutNormalValues(filteredSampleIndices, values);
 
             String geneSymbol = null;
@@ -616,7 +624,7 @@ public class ImportTabDelimData {
                     if (!microRNAGenes.isEmpty()) {
                         // for micro rna, duplicate the data
                         for (CanonicalGene gene : microRNAGenes) {
-                            boolean result = storeGeneticAlterations(values, daoGeneticAlteration, gene, geneSymbol);
+                            boolean result = this.geneticAlterationGeneImporter.storeGeneticAlterations(values, gene, geneSymbol);
                             if (result == true) {
                                 recordStored = true;
                             }
@@ -666,7 +674,7 @@ public class ImportTabDelimData {
                                     }
                                 }
                             }
-                            recordStored = storeGeneticAlterations(values, daoGeneticAlteration, genes.get(0), geneSymbol);
+                            recordStored = this.geneticAlterationGeneImporter.storeGeneticAlterations(values, genes.get(0), geneSymbol);
                             //only add extra CNA related records if the step above worked, otherwise skip:
                             if (recordStored) {
                                 for (CnaEvent cnaEvent : cnaEventsToAdd) {
@@ -683,7 +691,7 @@ public class ImportTabDelimData {
                         } else {
                             if (isRppaProfile) { // for protein data, duplicate the data
                                 for (CanonicalGene gene : genes) {
-                                    boolean result = storeGeneticAlterations(values, daoGeneticAlteration, gene, geneSymbol);
+                                    boolean result = this.geneticAlterationGeneImporter.storeGeneticAlterations(values, gene, geneSymbol);
                                     if (result == true) {
                                         recordStored = true;
                                         nrExtraRecords++;
@@ -805,32 +813,6 @@ public class ImportTabDelimData {
         return recordIsStored;
     }
 
-    private boolean storeGeneticAlterations(String[] values, DaoGeneticAlteration daoGeneticAlteration,
-            CanonicalGene gene, String geneSymbol) throws DaoException {
-        //  Check that we have not already imported information regarding this gene.
-        //  This is an important check, because a GISTIC or RAE file may contain
-        //  multiple rows for the same gene, and we only want to import the first row.
-        try {
-            if (!importSetOfGenes.contains(gene.getEntrezGeneId())) {
-                daoGeneticAlteration.addGeneticAlterations(geneticProfileId, gene.getEntrezGeneId(), values);
-                importSetOfGenes.add(gene.getEntrezGeneId());
-                return true;
-            }
-            else {
-                //TODO - review this part - maybe it should be an Exception instead of just a warning.
-                String geneSymbolMessage = "";
-                if (geneSymbol != null && !geneSymbol.equalsIgnoreCase(gene.getHugoGeneSymbolAllCaps()))
-                    geneSymbolMessage = " (given as alias in your file as: " + geneSymbol + ")";
-                ProgressMonitor.logWarning("Gene " + gene.getHugoGeneSymbolAllCaps() + " (" + gene.getEntrezGeneId() + ")" + geneSymbolMessage + " found to be duplicated in your file. Duplicated row will be ignored!");
-                return false;
-            }
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException("Aborted: Error found for row starting with " + geneSymbol + ": " + e.getMessage());
-        }
-    }
-    
     /**
      * Stores genetic alteration data for a genetic entity. 
      * @param values
@@ -1036,3 +1018,4 @@ public class ImportTabDelimData {
         this.pdAnnotationsFile = pdAnnotationsFile;
     }
 }
+

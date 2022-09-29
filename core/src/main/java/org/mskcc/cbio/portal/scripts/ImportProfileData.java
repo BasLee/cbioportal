@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Set;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import joptsimple.*;
 
 import org.cbioportal.model.EntityType;
@@ -85,6 +86,17 @@ public class ImportProfileData extends ConsoleRunnable {
                     "\n --> genetic alteration type:  " + geneticProfile.getGeneticAlterationType().name());
             ProgressMonitor.setMaxValue(numLines);
             
+            // TODO: remove
+            if (
+                geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
+                    && geneticProfile.getDatatype().equals("DISCRETE_LONG")
+            ) {
+                ProgressMonitor.setCurrentMessage("cna: " + new ObjectMapper().writeValueAsString(geneticProfile));
+            } else {
+                ProgressMonitor.setCurrentMessage("skip, not relevant: " + geneticProfile.getDatatype());
+                return;
+            }
+
             // Check genetic alteration type 
             if (geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_EXTENDED || 
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_UNCALLED) {
@@ -115,12 +127,15 @@ public class ImportProfileData extends ConsoleRunnable {
                     genericAssayProfileImporter.importData(numLines);
                 }
             } else {
-                ImportTabDelimData importer = new ImportTabDelimData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel);
+                System.out.println("genetic profile:" + new ObjectMapper().writeValueAsString(geneticProfile));
+//                ImportTabDelimData importer = new ImportTabDelimData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel);
+                ImportCnaDiscreteLongData importer = new ImportCnaDiscreteLongData(dataFile, geneticProfile.getGeneticProfileId(), genePanel);
                 String pdAnnotationsFilename = geneticProfile.getOtherMetaDataField("pd_annotations_filename");
-                if (pdAnnotationsFilename != null && !"".equals(pdAnnotationsFilename)) {
-                    importer.setPdAnnotationsFile(new File(dataFile.getParent(), pdAnnotationsFilename));
-                }
-                importer.importData(numLines);
+//                if (pdAnnotationsFilename != null && !"".equals(pdAnnotationsFilename)) {
+//                    importer.setPdAnnotationsFile(new File(dataFile.getParent(), pdAnnotationsFilename));
+//                }
+//                importer.importData(numLines);
+                importer.importData();
             }
        }
        catch (Exception e) {
