@@ -27,20 +27,25 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mskcc.cbio.portal.dao.DaoCancerStudy;
-import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.*;
+import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
@@ -48,7 +53,7 @@ import java.io.File;
 @Transactional
 public class TestImportCnaDiscreteLongData {
     int studyId;
-    int geneticProfileId;
+    GeneticProfile geneticProfile;
 
     @Before
     public void setUp() throws DaoException
@@ -56,18 +61,48 @@ public class TestImportCnaDiscreteLongData {
         studyId = DaoCancerStudy
             .getCancerStudyByStableId("study_tcga_pub")
             .getInternalId();
-        geneticProfileId = DaoGeneticProfile
-            .getGeneticProfileByStableId("study_tcga_pub_cna_long")
-            .getGeneticProfileId();
+        this.geneticProfile = DaoGeneticProfile
+            .getGeneticProfileByStableId("study_tcga_pub_cna_long");
     }
 
     @Test
     public void testImportCnaDiscreteLongData() throws Exception {
+        String sampleId1 = StableIdUtil.getSampleId("TCGA-A1-A0SB-11");
+        String sampleId2 = StableIdUtil.getSampleId("TCGA-A2-A04U-11");
+
+        List<CnaEvent.Event> beforeCnaEvents = DaoCnaEvent.getAllCnaEvents();
+
         ProgressMonitor.setConsoleMode(false);
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         String genePanel = "TESTPANEL_CNA";
-        ImportCnaDiscreteLongData importer = new ImportCnaDiscreteLongData(file, geneticProfileId, genePanel);
+        ImportCnaDiscreteLongData importer = new ImportCnaDiscreteLongData(
+            file, 
+            geneticProfile.getGeneticProfileId(), 
+            genePanel
+        );
         importer.importData();
+
+        assertSampleAndProfileExists(sampleId1);
+        assertSampleAndProfileExists(sampleId2);
+
+        List<CnaEvent.Event> afterCnaEvents = DaoCnaEvent.getAllCnaEvents();
+        int expectedNewCnaEvents = 12;
+        assertEquals(afterCnaEvents.size(), beforeCnaEvents.size());
+//        assertEquals(afterCnaEvents.size(), (beforeCnaEvents.size() + expectedNewCnaEvents));
         MySQLbulkLoader.flushAll();
+    }
+
+    private void assertSampleAndProfileExists(String sampleId1) throws DaoException {
+        Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(
+            geneticProfile.getCancerStudyId(),
+            sampleId1
+        );
+        Assert.assertNotNull(sample);
+        // TODO: first find created samples:
+//        DaoCnaEvent.getCnaEvents()
+        Assert.assertTrue(DaoSampleProfile.sampleExistsInGeneticProfile(
+            sample.getInternalId(), 
+            geneticProfile.getGeneticProfileId()
+        ));
     }
 }

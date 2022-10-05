@@ -1,9 +1,9 @@
 Hugo_Symbol	Entrez_Gene_Id	Sample_Id	Value	cbp_driver	cbp_driver_annotation	cbp_driver_tiers	cbp_driver_tiers_annotation
-AKT1	207	TCGA-A1-A0SB-11	0				
-AKT2	208	TCGA-A1-A0SB-11	0				
-ALK	238	TCGA-A1-A0SB-11	0				
-ARAF	369	TCGA-A1-A0SB-11	0				
-ATM	472	TCGA-A1-A0SB-11	0				
+AKT1	207	TCGA-A1-A0SB-11	2				
+AKT2	208	TCGA-A1-A0SB-11	2				
+ALK	238	TCGA-A1-A0SB-11	2				
+ARAF	369	TCGA-A1-A0SB-11	-2				
+ATM	472	TCGA-A1-A0SB-11	-2				
 AKT1	207	TCGA-A2-A04U-11	2	Putative_Passenger	Test passenger	Class 2	Class annotation
 AKT2	208	TCGA-A2-A04U-11	2	Putative_Driver	Test driver	Class 1	Class annotation
 ALK	238	TCGA-A2-A04U-11	2				

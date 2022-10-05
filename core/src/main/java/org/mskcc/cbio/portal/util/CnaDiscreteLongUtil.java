@@ -74,8 +74,6 @@ public class CnaDiscreteLongUtil {
     }
 
     public CnaEvent createCnaEvent(GeneticProfile geneticProfile, int sampleId, String[] parts) {
-
-//        String sampleId = TabDelimitedFileUtil.getPartString(getColumnIndex(SAMPLE_ID), parts);
         int cnaProfileId = geneticProfile.getGeneticProfileId();
         long entrezGeneId = getEntrezSymbol(parts);
         short alteration = getAlteration(parts);

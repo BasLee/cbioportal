@@ -44,6 +44,7 @@ public class ImportCnaDiscreteLongData {
     private boolean isDiscretizedCnaProfile;
     private final Map<CnaEvent.Event, CnaEvent.Event> existingCnaEvents = new HashMap<>();
     private final SampleFinder sampleFinder;
+    private final SampleProfileImporter sampleProfileImporter;
 
     public ImportCnaDiscreteLongData(
         File cnaFile,
@@ -54,7 +55,8 @@ public class ImportCnaDiscreteLongData {
         this.geneticProfileId = geneticProfileId;
         DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
         this.geneticAlterationGeneImporter = new GeneticAlterationGeneImporter(geneticProfileId, daoGeneticAlteration);
-        this.sampleFinder = new SampleFinder(geneticProfileId, genePanel);
+        this.sampleFinder = new SampleFinder();
+        this.sampleProfileImporter = new SampleProfileImporter(geneticProfileId, genePanel);
     }
 
     public void importData() throws Exception {
@@ -83,15 +85,24 @@ public class ImportCnaDiscreteLongData {
             lineIndex++;
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if (!line.startsWith("#") && line.trim().length() > 0) {
-                String parts[] = line.split("\t", -1);
+            boolean hasData = !line.startsWith("#") && line.trim().length() > 0;
+            if (hasData) {
+                String[] parts = line.split("\t", -1);
                 this.importCnaRecord(geneticProfile, parts, lineIndex);
             }
         }
+        ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): "
+            + sampleFinder.getSamplesSkipped()
+        );
         buf.close();
         MySQLbulkLoader.flushAll();
     }
 
+    /**
+     * Per regel:
+     * - record aanmaken in sample_cna_event
+     * - record aanmaken in cna_event
+     */
     public void importCnaRecord(
         GeneticProfile geneticProfile,
         String[] parts,
@@ -103,16 +114,13 @@ public class ImportCnaDiscreteLongData {
         if (gene == null) {
             throw new IllegalStateException("No gene could be found for line " + lineIndex);
         }
-        
+
         int cancerStudyId = geneticProfile.getCancerStudyId();
         String sampleIdStr = cnaUtil.getSampleIdStr(parts);
 
-        Sample sample = sampleFinder.findSample(
-            sampleIdStr,
-            cancerStudyId,
-            lineIndex
-        );
-        
+        Sample sample = sampleFinder.findSample(sampleIdStr, cancerStudyId);
+        sampleProfileImporter.createSampleProfile(sample);
+
         CnaEvent cna = cnaUtil.createCnaEvent(geneticProfile, sample.getInternalId(), parts);
         System.out.println("cna: " + new ObjectMapper().writeValueAsString(cna));
 
@@ -126,9 +134,19 @@ public class ImportCnaDiscreteLongData {
         }
 
         String geneSymbol = Strings.isNullOrEmpty(cna.getGeneSymbol()) ? cna.getGeneSymbol() : "" + cna.getEntrezGeneId();
+        
+        // In the original wide format, all alterations of a single gene were contained in single row
+        // Now every combination of sample and gene has their own row, resulting in an single value per row:
+        // TODO: 1. allemaal verzamelen per sample&gen:
         String[] values = new String[]{"" + cna.getAlteration().getCode()};
-
-        boolean recordStored = this.geneticAlterationGeneImporter.storeGeneticAlterations(values, gene, geneSymbol);
+        
+        // TODO: 2. als komma seperated list toevoegen aan  genetic_alteration:
+        boolean recordStored = this.geneticAlterationGeneImporter.storeGeneticAlterations(
+            values, 
+            gene, 
+            geneSymbol
+        );
+        // TODO: 3. alle waardes concatten en toevoegen in genetic_profile_samples
 
         if (recordStored) {
             if (existingCnaEvents.containsKey(cna.getEvent())) {
@@ -150,26 +168,10 @@ public class ImportCnaDiscreteLongData {
         CnaDiscreteLongUtil util
     ) {
 
-        String geneSymbol = null;
-
         String hugoSymbol = util.getHugoSymbol(parts);
-        if (!Strings.isNullOrEmpty(hugoSymbol)) {
-            geneSymbol = hugoSymbol;
-        }
 
-        if (geneSymbol == null && entrez == 0) {
+        if (Strings.isNullOrEmpty(hugoSymbol) && entrez == 0) {
             ProgressMonitor.logWarning("Ignoring line with no Hugo_Symbol or Entrez_Id value");
-            return null;
-        }
-        boolean ignoreGeneSymbol = geneSymbol != null && (geneSymbol.contains("///") || geneSymbol.contains("---"));
-        if (ignoreGeneSymbol) {
-            //  Ignore gene IDs separated by ///.  This indicates that
-            //  the line contains information regarding multiple genes, and
-            //  we cannot currently handle this.
-            //  Also, ignore gene IDs that are specified as ---.  This indicates
-            //  the line contains information regarding an unknown gene, and
-            //  we cannot currently handle this.
-            ProgressMonitor.logWarning("Ignoring gene ID:  " + geneSymbol);
             return null;
         }
         if (entrez != 0) {
@@ -177,31 +179,65 @@ public class ImportCnaDiscreteLongData {
             return this.daoGene.getGene(entrez);
         } else if (!Strings.isNullOrEmpty(hugoSymbol)) {
             //try hugo:
-            return daoGene.getGene(hugoSymbol, true).get(0);
+            if (hugoSymbol.contains("///") || hugoSymbol.contains("---")) {
+                //  Ignore gene IDs separated by ///.  This indicates that
+                //  the line contains information regarding multiple genes, and
+                //  we cannot currently handle this.
+                //  Also, ignore gene IDs that are specified as ---.  This indicates
+                //  the line contains information regarding an unknown gene, and
+                //  we cannot currently handle this.
+                ProgressMonitor.logWarning("Ignoring gene ID:  " + hugoSymbol);
+                return null;
+            }
+            int ix = hugoSymbol.indexOf("|");
+            if (ix > 0) {
+                hugoSymbol = hugoSymbol.substring(0, ix);
+            }
+            List<CanonicalGene> genes = daoGene.getGene(hugoSymbol, true);
+            if (genes.size() > 1) {
+                throw new IllegalStateException("Found multiple genes for Hugo symbol " + hugoSymbol + " while importing cna");
+            }
+            return genes.get(0);
         } else {
             ProgressMonitor.logWarning("Entrez_Id " + entrez + " not found. Record will be skipped for this gene.");
             return null;
         }
     }
+
+}
+
+class SampleIdGeneticProfileId {
+    public int sampleId;
+    public int geneticProfileId;
+
+    public SampleIdGeneticProfileId(int sampleId, int geneticProfileId) {
+        this.sampleId = sampleId;
+        this.geneticProfileId = geneticProfileId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+
+        SampleIdGeneticProfileId that = (SampleIdGeneticProfileId) o;
+        return sampleId == that.sampleId
+            && geneticProfileId == that.geneticProfileId;
+    }
 }
 
 class SampleFinder {
-    
-    private final ArrayList <Integer> filteredSampleIndices = new ArrayList<>();
+
     private int samplesSkipped = 0;
-    
-    private final int geneticProfileId;
-    private final String genePanel;
 
-    public SampleFinder(int geneticProfileId, String genePanel) {
-        this.geneticProfileId = geneticProfileId;
-        this.genePanel = genePanel;
-    }
-
+    /**
+     * Find sample and create sample profile when needed
+     */
     public Sample findSample(
         String sampleId,
-        int cancerStudyId,
-        int lineIndex
+        int cancerStudyId
     ) throws Exception {
         Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(
             cancerStudyId,
@@ -210,18 +246,50 @@ class SampleFinder {
         // can be null in case of 'normal' sample, throw exception if not 'normal' and sample not found in db
         if (sample == null) {
             if (StableIdUtil.isNormal(sampleId)) {
-                filteredSampleIndices.add(lineIndex);
                 samplesSkipped++;
                 return null;
             } else {
                 throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(sampleId));
             }
         }
-        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
-            Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
-            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelID);
-        }
         return sample;
+    }
+
+    public int getSamplesSkipped() {
+        return samplesSkipped;
+    }
+}
+
+class SampleProfileImporter {
+
+    private final ArrayList<SampleIdGeneticProfileId> sampleIdGeneticProfileIds = new ArrayList<>();
+
+    private final int geneticProfileId;
+    private final String genePanel;
+
+    public SampleProfileImporter(int geneticProfileId, String genePanel) {
+        this.geneticProfileId = geneticProfileId;
+        this.genePanel = genePanel;
+    }
+
+    /**
+     * Find sample and create sample profile when needed
+     *
+     * @return boolean created or not
+     */
+    public boolean createSampleProfile(
+        Sample sample
+    ) throws Exception {
+        boolean inDatabase = DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId);
+        Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
+        SampleIdGeneticProfileId toCreate = new SampleIdGeneticProfileId(sample.getInternalId(), geneticProfileId);
+        boolean isQueued = this.sampleIdGeneticProfileIds.contains(toCreate);
+        if (!inDatabase && !isQueued) {
+            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelID);
+            this.sampleIdGeneticProfileIds.add(toCreate);
+            return true;
+        }
+        return false;
     }
 
 }
