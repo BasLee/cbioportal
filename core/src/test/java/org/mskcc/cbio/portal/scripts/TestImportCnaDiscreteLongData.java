@@ -27,8 +27,6 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -53,8 +51,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
@@ -78,14 +77,13 @@ public class TestImportCnaDiscreteLongData {
     public void cleanUp() throws DaoException {
         MySQLbulkLoader.flushAll();
     }
-    
+
     /**
-     * Test the import of cna data file in long format consisting of:
+     * Test the import of cna data file in long format with:
      * - 2 samples
      */
     @Test
     public void testImportCnaDiscreteLongDataAddsSamples() throws Exception {
-        List<String> expectedSampleIds = newArrayList("TCGA-A1-A0SB-11", "TCGA-A2-A04U-11");
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
             file,
@@ -94,19 +92,18 @@ public class TestImportCnaDiscreteLongData {
         ).importData();
 
         // Test new samples are added:
+        List<String> expectedSampleIds = newArrayList("TCGA-A1-A0SB-11", "TCGA-A2-A04U-11");
         for (String id : expectedSampleIds) {
             assertSampleExistsInGeneticProfile(id);
         }
     }
 
     /**
-     * Test the import of cna data file in long format consisting of:
+     * Test the import of cna data file in long format with:
      * - 10 valid cna events (-2 or 2)
      */
     @Test
     public void testImportCnaDiscreteLongDataAddsCnaEvents() throws Exception {
-        int expectedCnaEventCount = 10;
-
         List<CnaEvent.Event> beforeCnaEvents = DaoCnaEvent.getAllCnaEvents();
         assertEquals(beforeCnaEvents.size(), 17);
 
@@ -117,25 +114,24 @@ public class TestImportCnaDiscreteLongData {
             genePanel
         ).importData();
 
-        List<CnaEvent.Event> afterCnaEvents = DaoCnaEvent.getAllCnaEvents();
+        List<CnaEvent.Event> resultCnaEvents = DaoCnaEvent.getAllCnaEvents();
 
         // Test all cna events are added:
+        int expectedCnaEventCount = 10;
         int expectedNewCnaEvents = beforeCnaEvents.size() + expectedCnaEventCount;
         assertEquals(
             expectedNewCnaEvents,
-            afterCnaEvents.size()
+            resultCnaEvents.size()
         );
     }
 
     /**
-     * Test the import of cna data file in long format consisting of:
+     * Test the import of cna data file in long format with:
      * - 7 genes
      */
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterations() throws Exception {
-        List<Long> expectedEntrezIds = newArrayList(2115L, 27334L, 57670L, 80070L, 3983L, 56914L, 2261L);
-
-        List<GeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
+        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
         assertEquals(beforeGeneticAlterations.size(), 42);
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
@@ -146,23 +142,24 @@ public class TestImportCnaDiscreteLongData {
         ).importData();
 
         // Test genetic alterations are added for all genes:
-        List<GeneticAlteration> afterGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size() + expectedEntrezIds.size(), afterGeneticAlterations.size());
+        List<TestGeneticAlteration> resultGeneticAlterations = getAllGeneticAlterations();
+        List<Long> expectedEntrezIds = newArrayList(2115L, 27334L, 57670L, 80070L, 3983L, 56914L, 2261L);
+        assertEquals(beforeGeneticAlterations.size() + expectedEntrezIds.size(), resultGeneticAlterations.size());
 
         // Test order of genetic alteration values:
-        GeneticAlteration geneticAlteration = getGeneticAlterationBy(2115L);
+        TestGeneticAlteration geneticAlteration = getGeneticAlterationBy(2115L);
         assertEquals(geneticProfile.getGeneticProfileId(), geneticAlteration.geneticProfileId);
-        assertEquals("2,-2,", geneticAlteration.value);
-        
+        assertEquals("2,-2,", geneticAlteration.values);
+
         // ... and the emptiness of a gene without cna's:
         geneticAlteration = getGeneticAlterationBy(56914L);
         assertEquals(geneticProfile.getGeneticProfileId(), geneticAlteration.geneticProfileId);
-        assertEquals("", geneticAlteration.value);
+        assertEquals("", geneticAlteration.values);
     }
 
-    
+
     /**
-     * Test the import of cna data file in long format consisting of:
+     * Test the import of cna data file in long format with:
      * - 2 samples
      */
     @Test
@@ -175,13 +172,51 @@ public class TestImportCnaDiscreteLongData {
         ).importData();
 
         // Test order of samples in genetic profile samples:
-        GeneticAlteration geneticAlteration = getGeneticAlterationBy(2115L);
-        GeneticProfileSample geneticProfileSample = getAllGeneticProfileSample(geneticProfile.getGeneticProfileId());
-        assertEquals(geneticProfile.getGeneticProfileId(), geneticAlteration.geneticProfileId);
+        TestGeneticProfileSample geneticProfileSample = getGeneticProfileSample(geneticProfile.getGeneticProfileId());
         assertEquals("21,20,", geneticProfileSample.orderedSampleList);
     }
 
-    private void assertSampleExistsInGeneticProfile(String sampleId) throws DaoException, JsonProcessingException {
+    /**
+     * Test the import of cna data file in long format with:
+     * - 3 cna events with pd annotations
+     */
+    @Test
+    public void testImportCnaDiscreteLongDataAddsPdAnnotations() throws Exception {
+        File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
+        new ImportCnaDiscreteLongData(
+            file,
+            geneticProfile.getGeneticProfileId(),
+            genePanel
+        ).importData();
+        List<Long> genes = newArrayList(3983L, 27334L, 2115L);
+        List<CnaEvent.Event> resultCnaEvents = DaoCnaEvent.getAllCnaEvents()
+            .stream()
+            .filter(event -> genes.contains(event.getGene().getEntrezGeneId()))
+            .collect(toList());
+        String sample = "TCGA-A2-A04U-11";
+        List<TestPdAnnotation> allCnaPdAnnotations = getAllCnaPdAnnotations(createPrimaryKeys(sample, resultCnaEvents));
+        assertEquals(3, allCnaPdAnnotations.size());
+        String allDriverTiersFilters = allCnaPdAnnotations
+            .stream()
+            .map(a -> a.driverTiersFilter)
+            .collect(joining(","));
+        assertEquals("Class 2,Class 1,NA", allDriverTiersFilters);
+    }
+
+    private List<TestPdAnnotationPK> createPrimaryKeys(String sample, List<CnaEvent.Event> cnaEvents) {
+        return cnaEvents.stream().map(e -> {
+            TestPdAnnotationPK pk = new TestPdAnnotationPK();
+            pk.geneticProfileId = geneticProfile.getGeneticProfileId();
+            pk.sampleId = DaoSample.getSampleByCancerStudyAndSampleId(
+                geneticProfile.getCancerStudyId(),
+                StableIdUtil.getSampleId(sample)
+            ).getInternalId();
+            pk.alterationEventId = e.getEventId();
+            return pk;
+        }).collect(toList());
+    }
+
+    private void assertSampleExistsInGeneticProfile(String sampleId) throws DaoException {
         String sampleStableId = StableIdUtil.getSampleId(sampleId);
 
         Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(
@@ -195,37 +230,73 @@ public class TestImportCnaDiscreteLongData {
         ));
     }
 
-    private GeneticAlteration getGeneticAlterationBy(long entrezId) throws DaoException {
+    private List<TestPdAnnotation> getAllCnaPdAnnotations(List<TestPdAnnotationPK> pks) throws DaoException {
+        List<String> pkStrings = new ArrayList<>();
+        for(TestPdAnnotationPK pk: pks) {
+            pkStrings.add(String.format(
+                "( ALTERATION_EVENT_ID=%d AND GENETIC_PROFILE_ID=%d AND SAMPLE_ID=%d )", 
+                pk.alterationEventId, pk.geneticProfileId, pk.sampleId
+            ));
+        }
+        
+        
+        String q = "SELECT DRIVER_TIERS_FILTER_ANNOTATION, DRIVER_TIERS_FILTER, DRIVER_FILTER_ANNOTATION, DRIVER_FILTER, " 
+            + "ALTERATION_EVENT_ID, GENETIC_PROFILE_ID, SAMPLE_ID "
+            + "FROM alteration_driver_annotation ";
+        if(pks.size() > 0) {
+            q += "WHERE " + String.join(" OR ", pkStrings);
+        }
+            
+        System.out.println("pkq:" + q);
+        return query(
+            q,
+            (ResultSet rs) -> {
+                TestPdAnnotation line = new TestPdAnnotation();
+                line.driverFilter = rs.getString("DRIVER_FILTER");
+                line.driverTiersFilter = rs.getString("DRIVER_TIERS_FILTER");
+                line.driverFilterAnnotation = rs.getString("DRIVER_FILTER_ANNOTATION");
+                line.driverTiersFilterAnnotation = rs.getString("DRIVER_TIERS_FILTER_ANNOTATION");
+
+                line.pk = new TestPdAnnotationPK();
+                line.pk.alterationEventId = rs.getInt("ALTERATION_EVENT_ID");
+                line.pk.geneticProfileId = rs.getInt("GENETIC_PROFILE_ID");
+                line.pk.sampleId = rs.getInt("SAMPLE_ID");
+
+                return line;
+            });
+    }
+
+    private List<TestGeneticAlteration> getAllGeneticAlterations() throws DaoException {
+        return query("SELECT * FROM genetic_alteration", (ResultSet rs) -> {
+            TestGeneticAlteration line = new TestGeneticAlteration();
+            line.geneticProfileId = rs.getInt("GENETIC_PROFILE_ID");
+            line.geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
+            line.values = rs.getString("VALUES");
+            return line;
+        });
+    }
+
+    private TestGeneticAlteration getGeneticAlterationBy(long entrezId) throws DaoException {
         return query("SELECT ga.GENETIC_PROFILE_ID, ga.GENETIC_ENTITY_ID, ga.VALUES, g.ENTREZ_GENE_ID " +
                 "FROM genetic_alteration AS ga " +
                 "RIGHT JOIN gene AS g " +
                 "ON g.GENETIC_ENTITY_ID = ga.GENETIC_ENTITY_ID " +
                 "WHERE g.ENTREZ_GENE_ID=" + entrezId,
             (ResultSet rs) -> {
-                GeneticAlteration line = new GeneticAlteration();
+                TestGeneticAlteration line = new TestGeneticAlteration();
                 line.geneticProfileId = rs.getInt("GENETIC_PROFILE_ID");
                 line.geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
-                line.value = rs.getString("VALUES");
+                line.values = rs.getString("VALUES");
                 line.entrezId = rs.getLong("ENTREZ_GENE_ID");
                 return line;
             }).get(0);
     }
 
-    private List<GeneticAlteration> getAllGeneticAlterations() throws DaoException {
-        return query("SELECT * FROM genetic_alteration", (ResultSet rs) -> {
-            GeneticAlteration line = new GeneticAlteration();
-            line.geneticProfileId = rs.getInt("GENETIC_PROFILE_ID");
-            line.geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
-            line.value = rs.getString("VALUES");
-            return line;
-        });
-    }
-
-    private GeneticProfileSample getAllGeneticProfileSample(long profileId) throws DaoException {
+    private TestGeneticProfileSample getGeneticProfileSample(long profileId) throws DaoException {
         return query(
             "SELECT * FROM genetic_profile_samples WHERE GENETIC_PROFILE_ID=" + profileId,
             (ResultSet rs) -> {
-                GeneticProfileSample line = new GeneticProfileSample();
+                TestGeneticProfileSample line = new TestGeneticProfileSample();
                 line.geneticProfileId = rs.getInt("GENETIC_PROFILE_ID");
                 line.orderedSampleList = rs.getString("ORDERED_SAMPLE_LIST");
                 return line;
@@ -254,16 +325,30 @@ public class TestImportCnaDiscreteLongData {
 
 }
 
-class GeneticAlteration {
+class TestGeneticAlteration {
     public int geneticProfileId;
     public int geneticEntityId;
-    public String value;
+    public String values;
     public long entrezId;
 }
 
-class GeneticProfileSample {
+class TestGeneticProfileSample {
     public int geneticProfileId;
     public String orderedSampleList;
+}
+
+class TestPdAnnotationPK {
+    public long alterationEventId;
+    public int sampleId;
+    public int geneticProfileId;
+}
+
+class TestPdAnnotation {
+    public TestPdAnnotationPK pk;
+    public String driverTiersFilterAnnotation;
+    public String driverTiersFilter;
+    public String driverFilterAnnotation;
+    public String driverFilter;
 }
 
 @FunctionalInterface

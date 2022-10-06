@@ -38,7 +38,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * TODO: should rows with empty values be imported into the genetic_alteration table?
+ * TODO: remove souts
+ * TODO: test pd annotations
+ * 
+ * TODO: q: should rows with empty values be imported into the genetic_alteration table?
+ * TODO: q: should cna pd annotations of skipped events also be skipped?
  */
 public class ImportCnaDiscreteLongData {
 
@@ -86,70 +90,86 @@ public class ImportCnaDiscreteLongData {
             }
             MySQLbulkLoader.bulkLoadOn();
         }
-        
+
         CnaImportData toImport = new CnaImportData();
-        
+
         while ((line = buf.readLine()) != null) {
             lineIndex++;
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
             boolean hasData = !line.startsWith("#") && line.trim().length() > 0;
             if (hasData) {
-                String[] parts = line.split("\t", -1);
-                this.extractDataToImport(geneticProfile, parts, lineIndex, toImport);
+                String[] lineSplit = line.split("\t", -1);
+                this.extractDataToImport(geneticProfile, lineSplit, lineIndex, toImport);
             }
         }
 
-        // Loop through genes:
-        for(Long entrezId : toImport.eventsTable.rowKeySet()) {
-            String[] values = toImport.eventsTable
-                .row(entrezId)
-                .values()
-                .stream()
-                .filter(v -> v.cna != null)
-                .map(v -> "" + v
-                    .cna
-                    .getAlteration()
-                    .getCode()
-                )
-                .toArray(String[]::new);
-
-            Optional<CanonicalGene> gene = toImport.genes.stream().filter(g -> g.getEntrezGeneId() == entrezId).findFirst();
-            if(!gene.isPresent()) {
+        for (Long entrezId : toImport.eventsTable.rowKeySet()) {
+            boolean added = storeGeneticAlterations(toImport, entrezId);
+            if (!added) {
+                ProgressMonitor.logWarning("Values not added to gene with entrezId: " 
+                    + entrezId 
+                    + ". Skip creation of cna events."
+                );
                 return;
             }
-            String geneSymbol = !Strings.isNullOrEmpty(gene.get().getHugoGeneSymbolAllCaps())
-                ? gene.get().getHugoGeneSymbolAllCaps()
-                : "" + entrezId;
-            boolean added = this.geneticAlterationGeneImporter.storeGeneticAlterations(values, gene.get(), geneSymbol);
-            
-            if (added) {
-                List<CnaEvent> cnas = toImport.eventsTable
-                    .row(entrezId)
-                    .values()
-                    .stream()
-                    .filter(v -> v.cna != null)
-                    .map(v -> v.cna)
-                    .collect(Collectors.toList());
-                for(CnaEvent cna: cnas) {
-                    if (existingCnaEvents.containsKey(cna.getEvent())) {
-                        cna.setEventId(existingCnaEvents.get(cna.getEvent()).getEventId());
-                        DaoCnaEvent.addCaseCnaEvent(cna, false);
-                    } else {
-                        DaoCnaEvent.addCaseCnaEvent(cna, true);
-                        existingCnaEvents.put(cna.getEvent(), cna.getEvent());
-                    }
-                }                                
-            }
+            storeCnaEvents(toImport, entrezId);
         }
-        ArrayList<Integer> orderedSampleList = new ArrayList(toImport.eventsTable.columnKeySet());
-        DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
+        DaoGeneticProfileSamples.addGeneticProfileSamples(
+            geneticProfileId,
+            new ArrayList(toImport.eventsTable.columnKeySet())
+        );
 
         ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): "
             + sampleFinder.getSamplesSkipped()
         );
         buf.close();
         MySQLbulkLoader.flushAll();
+    }
+
+    private void storeCnaEvents(CnaImportData toImport, Long entrezId) throws DaoException {
+        List<CnaEvent> cnaEvents = toImport.eventsTable
+            .row(entrezId)
+            .values()
+            .stream()
+            .filter(v -> v.cna != null)
+            .map(v -> v.cna)
+            .collect(Collectors.toList());
+        for (CnaEvent cna : cnaEvents) {
+            if (existingCnaEvents.containsKey(cna.getEvent())) {
+                cna.setEventId(existingCnaEvents.get(cna.getEvent()).getEventId());
+                DaoCnaEvent.addCaseCnaEvent(cna, false);
+            } else {
+                DaoCnaEvent.addCaseCnaEvent(cna, true);
+                existingCnaEvents.put(cna.getEvent(), cna.getEvent());
+            }
+        }
+    }
+
+    private boolean storeGeneticAlterations(CnaImportData toImport, Long entrezId) throws DaoException {
+        String[] values = toImport.eventsTable
+            .row(entrezId)
+            .values()
+            .stream()
+            .filter(v -> v.cna != null)
+            .map(v -> "" + v
+                .cna
+                .getAlteration()
+                .getCode()
+            )
+            .toArray(String[]::new);
+
+        Optional<CanonicalGene> gene = toImport.genes.stream().filter(g -> g.getEntrezGeneId() == entrezId).findFirst();
+        if (!gene.isPresent()) {
+            ProgressMonitor.logWarning("No gene found for entrezId: " + entrezId);
+            return false;
+        }
+
+        String geneSymbol = !Strings.isNullOrEmpty(gene.get().getHugoGeneSymbolAllCaps())
+            ? gene.get().getHugoGeneSymbolAllCaps()
+            : "" + entrezId;
+
+        return this.geneticAlterationGeneImporter.storeGeneticAlterations(values, gene.get(), geneSymbol);
     }
 
     /**
@@ -159,36 +179,35 @@ public class ImportCnaDiscreteLongData {
      */
     public void extractDataToImport(
         GeneticProfile geneticProfile,
-        String[] parts,
+        String[] lineParts,
         int lineIndex,
         CnaImportData importContainer
     ) throws Exception {
-        System.out.println("parts: " + new ObjectMapper().writeValueAsString(parts));
-        
-        CanonicalGene gene = this.getGene(cnaUtil.getEntrezSymbol(parts), parts, cnaUtil);
+        System.out.println("parts: " + new ObjectMapper().writeValueAsString(lineParts));
+
+        CanonicalGene gene = this.getGene(cnaUtil.getEntrezSymbol(lineParts), lineParts, cnaUtil);
         importContainer.genes.add(gene);
-        
+
         if (gene == null) {
             throw new IllegalStateException("No gene could be found for line " + lineIndex);
         }
 
         int cancerStudyId = geneticProfile.getCancerStudyId();
 
-        String sampleIdStr = cnaUtil.getSampleIdStr(parts);
+        String sampleIdStr = cnaUtil.getSampleIdStr(lineParts);
         Sample sample = sampleFinder.findSample(sampleIdStr, cancerStudyId);
-        // TODO: add sample profile:
-         sampleProfileImporter.createSampleProfile(sample);
+        sampleProfileImporter.createSampleProfile(sample);
 
         long entrezId = gene.getEntrezGeneId();
         int sampleId = sample.getInternalId();
         CnaEventImportData eventContainer = new CnaEventImportData();
         importContainer.eventsTable.put(entrezId, sampleId, eventContainer);
 
-        CnaEvent cna = cnaUtil.createCnaEventPojo(geneticProfile, sample.getInternalId(), parts);
+        CnaEvent cna = cnaUtil.createCnaEventPojo(geneticProfile, sample.getInternalId(), lineParts);
         System.out.println("cna: " + new ObjectMapper().writeValueAsString(cna));
 
         if (!isDiscretizedCnaProfile) {
-            ProgressMonitor.logWarning(String.format("Skip line %s, !isDiscretizedCnaProfile", lineIndex));
+            ProgressMonitor.logWarning(String.format("Skip line %s, cna profile is not discrete", lineIndex));
             return;
         }
 
@@ -197,19 +216,6 @@ public class ImportCnaDiscreteLongData {
         }
 
         eventContainer.cna = cna;
-        
-        // In the original wide format, all alterations of a single gene were contained in single row
-        // Now every combination of sample and gene has their own row, resulting in an single value per row:
-        // String[] values = new String[]{"" + cna.getAlteration().getCode()};
-        // TODO: 1. allemaal verzamelen per sample&gen:
-        // TODO: 2. als komma seperated list toevoegen aan  genetic_alteration:
-//        boolean recordStored = this.geneticAlterationGeneImporter.storeGeneticAlterations(
-//            values, 
-//            gene, 
-//            geneSymbol
-//        );
-        // TODO: 3. (wanneer?) alle waardes concatten en toevoegen in genetic_profile_samples
-
     }
 
     /**
