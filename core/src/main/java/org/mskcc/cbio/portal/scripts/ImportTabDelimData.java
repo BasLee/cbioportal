@@ -666,6 +666,7 @@ public class ImportTabDelimData {
                                     }
                                 }
                             }
+                            // Store all values per gene:
                             recordStored = storeGeneticAlterations(values, daoGeneticAlteration, genes.get(0), geneSymbol);
                             //only add extra CNA related records if the step above worked, otherwise skip:
                             if (recordStored) {

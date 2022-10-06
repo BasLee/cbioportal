@@ -51,7 +51,7 @@ import org.apache.commons.lang3.StringUtils;
  * @author Ethan Cerami.
  */
 public class DaoGeneticAlteration {
-    private static final String DELIM = ",";
+    public static final String DELIM = ",";
     public static final String NAN = "NaN";
     private static DaoGeneticAlteration daoGeneticAlteration = null;
 
