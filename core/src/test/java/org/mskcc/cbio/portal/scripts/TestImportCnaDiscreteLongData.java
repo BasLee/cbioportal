@@ -27,10 +27,8 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.cbioportal.model.CNA;
+import org.junit.*;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.*;
 import org.mskcc.cbio.portal.model.CnaEvent;
@@ -123,6 +121,22 @@ public class TestImportCnaDiscreteLongData {
             expectedNewCnaEvents,
             resultCnaEvents.size()
         );
+        
+        // Test gene with homozygous deletion and amplification has two cna events:
+        List<String> cnaEvents = resultCnaEvents
+            .stream()
+            .filter(e -> e.getGene().getEntrezGeneId() == 2115)
+            .map(e -> e.getAlteration().getDescription())
+            .collect(toList());
+        assertEquals(2, cnaEvents.size());
+        assertEquals("Amplified,Homozygously deleted", String.join(",", cnaEvents));
+        
+        // Test gene with homozygous deletion and amplification has two cna events:
+        List<CnaEvent.Event> skippedCnaEvents = resultCnaEvents
+            .stream()
+            .filter(e -> e.getGene().getEntrezGeneId() == 56914)
+            .collect(toList());
+        assertEquals(0, skippedCnaEvents.size());
     }
 
     /**
@@ -145,33 +159,52 @@ public class TestImportCnaDiscreteLongData {
         List<TestGeneticAlteration> resultGeneticAlterations = getAllGeneticAlterations();
         List<Long> expectedEntrezIds = newArrayList(2115L, 27334L, 57670L, 80070L, 3983L, 56914L, 2261L);
         assertEquals(beforeGeneticAlterations.size() + expectedEntrezIds.size(), resultGeneticAlterations.size());
-
-        // Test order of genetic alteration values:
-        TestGeneticAlteration geneticAlteration = getGeneticAlterationBy(2115L);
-        assertEquals(geneticProfile.getGeneticProfileId(), geneticAlteration.geneticProfileId);
-        assertEquals("2,-2,", geneticAlteration.values);
-
-        // ... and the emptiness of a gene without cna's:
-        geneticAlteration = getGeneticAlterationBy(56914L);
-        assertEquals(geneticProfile.getGeneticProfileId(), geneticAlteration.geneticProfileId);
-        assertEquals("", geneticAlteration.values);
     }
 
-
     /**
-     * Test the import of cna data file in long format with:
-     * - 2 samples
+     * Test the imported events match the imported genetic profile samples
      */
     @Test
-    public void testImportCnaDiscreteLongDataAddsGeneticProfileSamples() throws Exception {
+    public void testImportCnaDiscreteLongDataAddsGeneticAlterationsAndProfileSamplesInCorrectOrder() throws Exception {
+        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
+        assertEquals(beforeGeneticAlterations.size(), 42);
+
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
             file,
             geneticProfile.getGeneticProfileId(),
             genePanel
         ).importData();
+        
+        // Test order of genetic alteration values:
+        TestGeneticAlteration geneticAlteration = getGeneticAlterationBy(2115L);
+        assertEquals(geneticProfile.getGeneticProfileId(), geneticAlteration.geneticProfileId);
+        assertEquals("2,-2,", geneticAlteration.values);
 
-        // Test order of samples in genetic profile samples:
+        // Test order of samples in genetic profile samples matches the order in genetic alteration:
+        TestGeneticProfileSample geneticProfileSample = getGeneticProfileSample(geneticProfile.getGeneticProfileId());
+        assertEquals("21,20,", geneticProfileSample.orderedSampleList);
+    }
+
+    /**
+     * Test genetic events are imported, even when not imported as cna event
+     */
+    @Test
+    public void testImportCnaDiscreteLongDataAddsGeneticAlterationsFromNonCnaEvents() throws Exception {
+        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
+        assertEquals(beforeGeneticAlterations.size(), 42);
+
+        File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
+        new ImportCnaDiscreteLongData(
+            file,
+            geneticProfile.getGeneticProfileId(),
+            genePanel
+        ).importData();
+        
+        // Test genetic alteration are added:
+        TestGeneticAlteration geneticAlteration = getGeneticAlterationBy(56914);
+        assertEquals(geneticProfile.getGeneticProfileId(), geneticAlteration.geneticProfileId);
+        assertEquals("0,1,", geneticAlteration.values);
         TestGeneticProfileSample geneticProfileSample = getGeneticProfileSample(geneticProfile.getGeneticProfileId());
         assertEquals("21,20,", geneticProfileSample.orderedSampleList);
     }

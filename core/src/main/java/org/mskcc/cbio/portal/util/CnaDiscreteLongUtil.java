@@ -73,7 +73,7 @@ public class CnaDiscreteLongUtil {
         }
     }
 
-    public CnaEvent createCnaEventPojo(GeneticProfile geneticProfile, int sampleId, String[] parts) {
+    public CnaEvent createEvent(GeneticProfile geneticProfile, int sampleId, String[] parts) {
         int cnaProfileId = geneticProfile.getGeneticProfileId();
         long entrezGeneId = getEntrezSymbol(parts);
         short alteration = getAlteration(parts);

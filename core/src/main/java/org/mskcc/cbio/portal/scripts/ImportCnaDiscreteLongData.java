@@ -37,12 +37,20 @@ import java.io.FileReader;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
+
 /**
  * TODO: remove souts
- * TODO: test pd annotations
  * 
- * TODO: q: should rows with empty values be imported into the genetic_alteration table?
- * TODO: q: should cna pd annotations of skipped events also be skipped?
+ * TODO: should rows with empty values be imported into the genetic_alteration table?
+ * TODO: should cna pd annotations of skipped events also be skipped?
+ * 
+ * TODO: 0?
+ * TODO: ook testen wat niet opgeslagen wordt
+ * TODO: duplicate rows, en filtering van 0 en 1
+ * 
+ * DONE: alterations wel opgeslagen, maar cna's niet
+ * DONE: test pd annotations
  */
 public class ImportCnaDiscreteLongData {
 
@@ -107,13 +115,10 @@ public class ImportCnaDiscreteLongData {
         for (Long entrezId : toImport.eventsTable.rowKeySet()) {
             boolean added = storeGeneticAlterations(toImport, entrezId);
             if (!added) {
-                ProgressMonitor.logWarning("Values not added to gene with entrezId: " 
-                    + entrezId 
-                    + ". Skip creation of cna events."
-                );
-                return;
+                ProgressMonitor.logWarning("Values not added to gene with entrezId: " + entrezId + ". Skip creation of cna events.");
+            } else {
+                storeEvents(toImport, entrezId);
             }
-            storeCnaEvents(toImport, entrezId);
         }
         DaoGeneticProfileSamples.addGeneticProfileSamples(
             geneticProfileId,
@@ -127,15 +132,19 @@ public class ImportCnaDiscreteLongData {
         MySQLbulkLoader.flushAll();
     }
 
-    private void storeCnaEvents(CnaImportData toImport, Long entrezId) throws DaoException {
-        List<CnaEvent> cnaEvents = toImport.eventsTable
+    private void storeEvents(CnaImportData toImport, Long entrezId) throws DaoException {
+        List<CnaEvent> events = toImport.eventsTable
             .row(entrezId)
             .values()
             .stream()
-            .filter(v -> v.cna != null)
-            .map(v -> v.cna)
-            .collect(Collectors.toList());
-        for (CnaEvent cna : cnaEvents) {
+            .filter(v -> v.geneticEvent != null)
+            .map(v -> v.geneticEvent)
+            .collect(toList());
+        for (CnaEvent cna : events) {
+
+            if (!cna.getAlteration().equals(CNA.AMP) && !cna.getAlteration().equals(CNA.HOMDEL)) {
+                return;
+            }
             if (existingCnaEvents.containsKey(cna.getEvent())) {
                 cna.setEventId(existingCnaEvents.get(cna.getEvent()).getEventId());
                 DaoCnaEvent.addCaseCnaEvent(cna, false);
@@ -151,9 +160,9 @@ public class ImportCnaDiscreteLongData {
             .row(entrezId)
             .values()
             .stream()
-            .filter(v -> v.cna != null)
+            .filter(v -> v.geneticEvent != null)
             .map(v -> "" + v
-                .cna
+                .geneticEvent
                 .getAlteration()
                 .getCode()
             )
@@ -203,19 +212,10 @@ public class ImportCnaDiscreteLongData {
         CnaEventImportData eventContainer = new CnaEventImportData();
         importContainer.eventsTable.put(entrezId, sampleId, eventContainer);
 
-        CnaEvent cna = cnaUtil.createCnaEventPojo(geneticProfile, sample.getInternalId(), lineParts);
-        System.out.println("cna: " + new ObjectMapper().writeValueAsString(cna));
+        CnaEvent event = cnaUtil.createEvent(geneticProfile, sample.getInternalId(), lineParts);
+        System.out.println("cna: " + new ObjectMapper().writeValueAsString(event));
 
-        if (!isDiscretizedCnaProfile) {
-            ProgressMonitor.logWarning(String.format("Skip line %s, cna profile is not discrete", lineIndex));
-            return;
-        }
-
-        if (!cna.getAlteration().equals(CNA.AMP) && !cna.getAlteration().equals(CNA.HOMDEL)) {
-            return;
-        }
-
-        eventContainer.cna = cna;
+        eventContainer.geneticEvent = event;
     }
 
     /**
@@ -362,6 +362,6 @@ class CnaImportData {
 
 class CnaEventImportData {
     public int line;
-    public CnaEvent cna;
+    public CnaEvent geneticEvent;
     public String geneSymbol;
 }
