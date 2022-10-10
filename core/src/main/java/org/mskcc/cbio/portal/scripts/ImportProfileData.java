@@ -86,17 +86,6 @@ public class ImportProfileData extends ConsoleRunnable {
                     "\n --> genetic alteration type:  " + geneticProfile.getGeneticAlterationType().name());
             ProgressMonitor.setMaxValue(numLines);
             
-            // TODO: remove
-            if (
-                geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
-                    && geneticProfile.getDatatype().equals("DISCRETE_LONG")
-            ) {
-                ProgressMonitor.setCurrentMessage("cna: " + new ObjectMapper().writeValueAsString(geneticProfile));
-            } else {
-                ProgressMonitor.setCurrentMessage("skip, not relevant: " + geneticProfile.getDatatype());
-                return;
-            }
-
             // Check genetic alteration type 
             if (geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_EXTENDED || 
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_UNCALLED) {
@@ -126,17 +115,19 @@ public class ImportProfileData extends ConsoleRunnable {
                     ImportTabDelimData genericAssayProfileImporter = new ImportTabDelimData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel, geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"));
                     genericAssayProfileImporter.importData(numLines);
                 }
-            } else {
-                System.out.println("genetic profile:" + new ObjectMapper().writeValueAsString(geneticProfile));
-//                ImportTabDelimData importer = new ImportTabDelimData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel);
+            } else if(
+                geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION 
+                && geneticProfile.getDatatype().equals("DISCRETE_LONG")
+            ) {
                 ImportCnaDiscreteLongData importer = new ImportCnaDiscreteLongData(dataFile, geneticProfile.getGeneticProfileId(), genePanel);
-                String pdAnnotationsFilename = geneticProfile.getOtherMetaDataField("pd_annotations_filename");
-//                if (pdAnnotationsFilename != null && !"".equals(pdAnnotationsFilename)) {
-//                    importer.setPdAnnotationsFile(new File(dataFile.getParent(), pdAnnotationsFilename));
-//                }
-//                importer.importData(numLines);
                 importer.importData();
-            }
+            } else {
+                ImportTabDelimData importer = new ImportTabDelimData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel);
+                String pdAnnotationsFilename = geneticProfile.getOtherMetaDataField("pd_annotations_filename");
+                if (pdAnnotationsFilename != null && !"".equals(pdAnnotationsFilename)) {
+                    importer.setPdAnnotationsFile(new File(dataFile.getParent(), pdAnnotationsFilename));
+                }
+                importer.importData(numLines);            }
        }
        catch (Exception e) {
     	   e.printStackTrace();
