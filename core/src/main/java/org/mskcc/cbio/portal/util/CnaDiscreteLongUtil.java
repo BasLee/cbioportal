@@ -76,7 +76,7 @@ public class CnaDiscreteLongUtil {
     public CnaEvent createEvent(GeneticProfile geneticProfile, int sampleId, String[] parts) {
         int cnaProfileId = geneticProfile.getGeneticProfileId();
         long entrezGeneId = getEntrezSymbol(parts);
-        short alteration = getAlteration(parts);
+        short alteration = createAlteration(parts);
         CnaEvent cna = new CnaEvent(sampleId, cnaProfileId, entrezGeneId, alteration);
         cna.setDriverFilter(TabDelimitedFileUtil.getPartString(getColumnIndex(CnaDiscreteLongUtil.CBP_DRIVER), parts));
         cna.setDriverFilterAnnotation(TabDelimitedFileUtil.getPartString(getColumnIndex(CnaDiscreteLongUtil.CBP_DRIVER_ANNOTATION), parts));
@@ -100,7 +100,7 @@ public class CnaDiscreteLongUtil {
         return TabDelimitedFileUtil.getPartString(getColumnIndex(CnaDiscreteLongUtil.HUGO_SYMBOL), parts);
     }
     
-    private short getAlteration(String[] parts) {
+    private short createAlteration(String[] parts) {
         String value = TabDelimitedFileUtil.getPartString(getColumnIndex(CnaDiscreteLongUtil.VALUE), parts);
         String result = value;
         // temporary solution -- change partial deletion back to full deletion.

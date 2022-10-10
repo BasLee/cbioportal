@@ -35,8 +35,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.*;
-import java.util.stream.Collectors;
 
+import static com.google.common.collect.Lists.newArrayList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -45,10 +45,12 @@ import static java.util.stream.Collectors.toList;
  * TODO: should rows with empty values be imported into the genetic_alteration table?
  * TODO: should cna pd annotations of skipped events also be skipped?
  * 
- * TODO: 0?
+ * TODO: missing row?
  * TODO: ook testen wat niet opgeslagen wordt
- * TODO: duplicate rows, en filtering van 0 en 1
- * 
+ * TODO: duplicate rows
+ * TODO: reuse CnaDiscreteLongUtil
+ *
+ * DONE: filtering van 0 en 1
  * DONE: alterations wel opgeslagen, maar cna's niet
  * DONE: test pd annotations
  */
@@ -112,18 +114,19 @@ public class ImportCnaDiscreteLongData {
             }
         }
 
+        DaoGeneticProfileSamples.addGeneticProfileSamples(
+            geneticProfileId,
+            newArrayList(toImport.eventsTable.columnKeySet())
+        );
+
         for (Long entrezId : toImport.eventsTable.rowKeySet()) {
             boolean added = storeGeneticAlterations(toImport, entrezId);
             if (!added) {
                 ProgressMonitor.logWarning("Values not added to gene with entrezId: " + entrezId + ". Skip creation of cna events.");
             } else {
-                storeEvents(toImport, entrezId);
+                storeCnaEvents(toImport, entrezId);
             }
         }
-        DaoGeneticProfileSamples.addGeneticProfileSamples(
-            geneticProfileId,
-            new ArrayList(toImport.eventsTable.columnKeySet())
-        );
 
         ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): "
             + sampleFinder.getSamplesSkipped()
@@ -132,7 +135,7 @@ public class ImportCnaDiscreteLongData {
         MySQLbulkLoader.flushAll();
     }
 
-    private void storeEvents(CnaImportData toImport, Long entrezId) throws DaoException {
+    private void storeCnaEvents(CnaImportData toImport, Long entrezId) throws DaoException {
         List<CnaEvent> events = toImport.eventsTable
             .row(entrezId)
             .values()
@@ -213,7 +216,7 @@ public class ImportCnaDiscreteLongData {
         importContainer.eventsTable.put(entrezId, sampleId, eventContainer);
 
         CnaEvent event = cnaUtil.createEvent(geneticProfile, sample.getInternalId(), lineParts);
-        System.out.println("cna: " + new ObjectMapper().writeValueAsString(event));
+        System.out.println("event: " + new ObjectMapper().writeValueAsString(event));
 
         eventContainer.geneticEvent = event;
     }

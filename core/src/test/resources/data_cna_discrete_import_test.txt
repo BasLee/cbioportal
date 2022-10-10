@@ -9,7 +9,9 @@ ETV1	2115	TCGA-A2-A04U-11	-2	Putative_Passenger	Test passenger	Class 2	Class ann
 P2RY10	27334	TCGA-A2-A04U-11	-2	Putative_Driver	Test driver	Class 1	Class annotation
 KIAA1549	57670	TCGA-A2-A04U-11	-2				
 ADAMTS20	80070	TCGA-A2-A04U-11	-2				
-ABLIM1	3983	TCGA-A2-A04U-11	-2	Putative_Passenger	Test passenger		
+
+# partial deletion gets converted into full deletion:
+ABLIM1	3983	TCGA-A2-A04U-11	-1.5	Putative_Passenger	Test passenger		
 
 # Ignore hemizygous deletion and value gain:
 OTOR	56914	TCGA-A2-A04U-11	0				

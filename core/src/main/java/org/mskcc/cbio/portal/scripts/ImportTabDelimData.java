@@ -650,7 +650,8 @@ public class ImportTabDelimData {
                                         // || values[i].equals(CNA_VALUE_GAIN)  >> skipping GAIN, ZERO, HEMIZYGOUS_DELETION to minimize size of dataset in DB
                                         // || values[i].equals(CNA_VALUE_ZERO)
                                         // || values[i].equals(CNA_VALUE_HEMIZYGOUS_DELETION)
-                                        || values[i].equals(CNA_VALUE_HOMOZYGOUS_DELETION)) {
+                                        || values[i].equals(CNA_VALUE_HOMOZYGOUS_DELETION)
+                                    ) {
                                         Integer sampleId = orderedSampleList.get(i);
                                         CnaEvent cnaEvent = new CnaEvent(sampleId, geneticProfileId, entrezGeneId, Short.parseShort(values[i]));
                                         //delayed add:

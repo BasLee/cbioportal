@@ -27,8 +27,10 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.cbioportal.model.CNA;
-import org.junit.*;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.*;
 import org.mskcc.cbio.portal.model.CnaEvent;
@@ -77,8 +79,7 @@ public class TestImportCnaDiscreteLongData {
     }
 
     /**
-     * Test the import of cna data file in long format with:
-     * - 2 samples
+     * Test the import of cna data file in long format with 2 samples
      */
     @Test
     public void testImportCnaDiscreteLongDataAddsSamples() throws Exception {
@@ -98,7 +99,8 @@ public class TestImportCnaDiscreteLongData {
 
     /**
      * Test the import of cna data file in long format with:
-     * - 10 valid cna events (-2 or 2)
+     * - 10 cna events (-2, -1.5 or 2)
+     * - 4 non-cna events (0, -1, 1)
      */
     @Test
     public void testImportCnaDiscreteLongDataAddsCnaEvents() throws Exception {
@@ -131,7 +133,16 @@ public class TestImportCnaDiscreteLongData {
         assertEquals(2, cnaEvents.size());
         assertEquals("Amplified,Homozygously deleted", String.join(",", cnaEvents));
         
-        // Test gene with homozygous deletion and amplification has two cna events:
+        // Test gene with partial deletion and amplification has two cna events:
+        List<String> convertedCnaEvents = resultCnaEvents
+            .stream()
+            .filter(e -> e.getGene().getEntrezGeneId() == 3983)
+            .map(e -> e.getAlteration().getDescription())
+            .collect(toList());
+        assertEquals(2, cnaEvents.size());
+        assertEquals("Amplified,Homozygously deleted", String.join(",", cnaEvents));
+        
+        // Test gene with homozygous deletion and amplification has no cna events:
         List<CnaEvent.Event> skippedCnaEvents = resultCnaEvents
             .stream()
             .filter(e -> e.getGene().getEntrezGeneId() == 56914)
@@ -140,8 +151,7 @@ public class TestImportCnaDiscreteLongData {
     }
 
     /**
-     * Test the import of cna data file in long format with:
-     * - 7 genes
+     * Test the import of cna data file in long format with 7 genes
      */
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterations() throws Exception {
@@ -201,7 +211,7 @@ public class TestImportCnaDiscreteLongData {
             genePanel
         ).importData();
         
-        // Test genetic alteration are added:
+        // Test genetic alteration are added of non-cna event:
         TestGeneticAlteration geneticAlteration = getGeneticAlterationBy(56914);
         assertEquals(geneticProfile.getGeneticProfileId(), geneticAlteration.geneticProfileId);
         assertEquals("0,1,", geneticAlteration.values);
