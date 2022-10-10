@@ -54,11 +54,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Test the import of Segment data into database.
- *
  * @author pieterlukasse
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
+@ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
 public class TestImportCopyNumberSegmentData {
@@ -72,7 +71,8 @@ public class TestImportCopyNumberSegmentData {
 
 
     @Before
-    public void setUp() throws DaoException {
+    public void setUp() throws DaoException
+    {
         //set it, to avoid this being set to the runtime (not for testing) application context:
         SpringUtil.setApplicationContext(applicationContext);
     }
@@ -86,14 +86,14 @@ public class TestImportCopyNumberSegmentData {
     @Test
     public void testImportSegmentDataNewStudy() throws Exception {
         //new dummy study to simulate importing clinical data in empty study:
-        CancerStudy cancerStudy = new CancerStudy("testnewseg", "testnewseg", "testnewseg", "brca", true);
+        CancerStudy cancerStudy = new CancerStudy("testnewseg","testnewseg","testnewseg","brca",true);
         cancerStudy.setReferenceGenome("hg19");
         DaoCancerStudy.addCancerStudy(cancerStudy);
         addTestPatientAndSampleRecords(new File("src/test/resources/segment/data_cna_hg19.seg"), cancerStudy);
 
         String[] args = {
-            "--data", "src/test/resources/segment/data_cna_hg19.seg",
-            "--meta", "src/test/resources/segment/meta_cna_hg19_seg.txt",
+            "--data","src/test/resources/segment/data_cna_hg19.seg",
+            "--meta","src/test/resources/segment/meta_cna_hg19_seg.txt",
             "--loadMode", "bulkLoad"
         };
         ImportCopyNumberSegmentData runner = new ImportCopyNumberSegmentData(args);
@@ -108,7 +108,7 @@ public class TestImportCopyNumberSegmentData {
         BufferedReader buf = new BufferedReader(reader);
         String line = buf.readLine(); // want to skip first line / header line
         List<String> sampleIds = new ArrayList<>();
-        while ((line = buf.readLine()) != null) {
+        while ((line=buf.readLine()) != null) {
             String[] parts = line.split("\t");
             if (!sampleIds.contains(parts[0])) {
                 sampleIds.add(parts[0]);
