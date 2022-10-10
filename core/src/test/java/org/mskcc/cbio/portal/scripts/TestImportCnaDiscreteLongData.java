@@ -217,6 +217,28 @@ public class TestImportCnaDiscreteLongData {
         assertEquals("0,1,", geneticAlteration.values);
         TestGeneticProfileSample geneticProfileSample = getGeneticProfileSample(geneticProfile.getGeneticProfileId());
         assertEquals("21,20,", geneticProfileSample.orderedSampleList);
+    }   
+    
+    /**
+     * Test genetic events are imported, even when not imported as cna event
+     */
+    @Test
+    public void testImportCnaDiscreteLongDataIgnoresLineWithDuplicateGene() throws Exception {
+        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
+        assertEquals(beforeGeneticAlterations.size(), 42);
+
+        File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
+        new ImportCnaDiscreteLongData(
+            file,
+            geneticProfile.getGeneticProfileId(),
+            genePanel
+        ).importData();
+        
+        // Test genetic alteration are deduplicated:
+        TestGeneticAlteration geneticAlteration = getGeneticAlterationBy(57670);
+        assertEquals(geneticProfile.getGeneticProfileId(), geneticAlteration.geneticProfileId);
+        // Should not be "2,-2,2" or (2,2):
+        assertEquals("2,-2,", geneticAlteration.values);
     }
 
     /**

@@ -37,22 +37,23 @@ import java.io.FileReader;
 import java.util.*;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static java.lang.String.format;
 import static java.util.stream.Collectors.toList;
 
 /**
- * TODO: remove souts
- * 
  * TODO: should rows with empty values be imported into the genetic_alteration table?
  * TODO: should cna pd annotations of skipped events also be skipped?
- * 
+ * <p>
+ * TODO: fix failing tests of other imports after changing of test data
  * TODO: missing row?
  * TODO: ook testen wat niet opgeslagen wordt
- * TODO: duplicate rows
  * TODO: reuse CnaDiscreteLongUtil
- *
+ * <p>
  * DONE: filtering van 0 en 1
  * DONE: alterations wel opgeslagen, maar cna's niet
  * DONE: test pd annotations
+ * DONE: remove souts
+ * DONE: duplicate rows
  */
 public class ImportCnaDiscreteLongData {
 
@@ -61,7 +62,6 @@ public class ImportCnaDiscreteLongData {
     private final GeneticAlterationGeneImporter geneticAlterationGeneImporter;
     private final DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
     private CnaDiscreteLongUtil cnaUtil;
-    private boolean isDiscretizedCnaProfile;
     private final Map<CnaEvent.Event, CnaEvent.Event> existingCnaEvents = new HashMap<>();
     private final SampleFinder sampleFinder;
     private final SampleProfileImporter sampleProfileImporter;
@@ -90,7 +90,7 @@ public class ImportCnaDiscreteLongData {
 
         GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
 
-        isDiscretizedCnaProfile = geneticProfile != null
+        boolean isDiscretizedCnaProfile = geneticProfile != null
             && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
             && geneticProfile.showProfileInAnalysisTab();
 
@@ -107,11 +107,7 @@ public class ImportCnaDiscreteLongData {
             lineIndex++;
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            boolean hasData = !line.startsWith("#") && line.trim().length() > 0;
-            if (hasData) {
-                String[] lineSplit = line.split("\t", -1);
-                this.extractDataToImport(geneticProfile, lineSplit, lineIndex, toImport);
-            }
+            this.extractDataToImport(geneticProfile, line, lineIndex, toImport);
         }
 
         DaoGeneticProfileSamples.addGeneticProfileSamples(
@@ -121,18 +117,55 @@ public class ImportCnaDiscreteLongData {
 
         for (Long entrezId : toImport.eventsTable.rowKeySet()) {
             boolean added = storeGeneticAlterations(toImport, entrezId);
-            if (!added) {
-                ProgressMonitor.logWarning("Values not added to gene with entrezId: " + entrezId + ". Skip creation of cna events.");
-            } else {
+            if (added) {
                 storeCnaEvents(toImport, entrezId);
+            } else {
+                ProgressMonitor.logWarning("Values not added to gene with entrezId: " + entrezId + ". Skip creation of cna events.");
             }
         }
 
-        ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): "
-            + sampleFinder.getSamplesSkipped()
+        ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + sampleFinder.getSamplesSkipped()
         );
         buf.close();
         MySQLbulkLoader.flushAll();
+    }
+
+    public void extractDataToImport(
+        GeneticProfile geneticProfile,
+        String line,
+        int lineIndex,
+        CnaImportData importContainer
+    ) throws Exception {
+        boolean hasData = !line.startsWith("#") && line.trim().length() > 0;
+        if (!hasData) {
+            return;
+        }
+        String[] lineParts = line.split("\t", -1);
+        CanonicalGene gene = this.getGene(cnaUtil.getEntrezSymbol(lineParts), lineParts, cnaUtil);
+        importContainer.genes.add(gene);
+
+        if (gene == null) {
+            return;
+        }
+
+        int cancerStudyId = geneticProfile.getCancerStudyId();
+
+        String sampleIdStr = cnaUtil.getSampleIdStr(lineParts);
+        Sample sample = sampleFinder.findSample(sampleIdStr, cancerStudyId);
+        sampleProfileImporter.createSampleProfile(sample);
+
+        long entrezId = gene.getEntrezGeneId();
+        int sampleId = sample.getInternalId();
+        CnaEventImportData eventContainer = new CnaEventImportData();
+        Table<Long, Integer, CnaEventImportData> geneBySampleEventTable = importContainer.eventsTable;
+
+        if (!geneBySampleEventTable.contains(entrezId, sample.getInternalId())) {
+            geneBySampleEventTable.put(entrezId, sampleId, eventContainer);
+        } else {
+            ProgressMonitor.logWarning(format("Skipping line %d with duplicate gene %d and sample %d", lineIndex, entrezId, sampleId));
+        }
+
+        eventContainer.geneticEvent = cnaUtil.createEvent(geneticProfile, sample.getInternalId(), lineParts);
     }
 
     private void storeCnaEvents(CnaImportData toImport, Long entrezId) throws DaoException {
@@ -171,7 +204,10 @@ public class ImportCnaDiscreteLongData {
             )
             .toArray(String[]::new);
 
-        Optional<CanonicalGene> gene = toImport.genes.stream().filter(g -> g.getEntrezGeneId() == entrezId).findFirst();
+        Optional<CanonicalGene> gene = toImport.genes
+            .stream()
+            .filter(g -> g != null && g.getEntrezGeneId() == entrezId)
+            .findFirst();
         if (!gene.isPresent()) {
             ProgressMonitor.logWarning("No gene found for entrezId: " + entrezId);
             return false;
@@ -182,43 +218,6 @@ public class ImportCnaDiscreteLongData {
             : "" + entrezId;
 
         return this.geneticAlterationGeneImporter.storeGeneticAlterations(values, gene.get(), geneSymbol);
-    }
-
-    /**
-     * Per regel:
-     * - record aanmaken in sample_cna_event
-     * - record aanmaken in cna_event
-     */
-    public void extractDataToImport(
-        GeneticProfile geneticProfile,
-        String[] lineParts,
-        int lineIndex,
-        CnaImportData importContainer
-    ) throws Exception {
-        System.out.println("parts: " + new ObjectMapper().writeValueAsString(lineParts));
-
-        CanonicalGene gene = this.getGene(cnaUtil.getEntrezSymbol(lineParts), lineParts, cnaUtil);
-        importContainer.genes.add(gene);
-
-        if (gene == null) {
-            throw new IllegalStateException("No gene could be found for line " + lineIndex);
-        }
-
-        int cancerStudyId = geneticProfile.getCancerStudyId();
-
-        String sampleIdStr = cnaUtil.getSampleIdStr(lineParts);
-        Sample sample = sampleFinder.findSample(sampleIdStr, cancerStudyId);
-        sampleProfileImporter.createSampleProfile(sample);
-
-        long entrezId = gene.getEntrezGeneId();
-        int sampleId = sample.getInternalId();
-        CnaEventImportData eventContainer = new CnaEventImportData();
-        importContainer.eventsTable.put(entrezId, sampleId, eventContainer);
-
-        CnaEvent event = cnaUtil.createEvent(geneticProfile, sample.getInternalId(), lineParts);
-        System.out.println("event: " + new ObjectMapper().writeValueAsString(event));
-
-        eventContainer.geneticEvent = event;
     }
 
     /**
