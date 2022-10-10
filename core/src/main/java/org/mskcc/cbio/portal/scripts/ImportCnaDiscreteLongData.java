@@ -41,19 +41,19 @@ import static java.lang.String.format;
 import static java.util.stream.Collectors.toList;
 
 /**
- * TODO: should rows with empty values be imported into the genetic_alteration table?
- * TODO: should cna pd annotations of skipped events also be skipped?
- * <p>
- * TODO: fix failing tests of other imports after changing of test data
- * TODO: missing row?
- * TODO: ook testen wat niet opgeslagen wordt
- * TODO: reuse CnaDiscreteLongUtil
+ * TODO: 1. fix failing tests of other imports after changing of test data
+ * TODO: 2. should rows with empty values be imported into the genetic_alteration table?
+ * TODO: 3. what to do with missing row?
+ * TODO: 4. reuse CnaDiscreteLongUtil
+ * TODO: 5. extract and reuse TabDelim functionality
+ * 
  * <p>
  * DONE: filtering van 0 en 1
  * DONE: alterations wel opgeslagen, maar cna's niet
  * DONE: test pd annotations
  * DONE: remove souts
  * DONE: duplicate rows
+ * DONE: should cna pd annotations of skipped events also be skipped? -> should be imported if cna event is imported
  */
 public class ImportCnaDiscreteLongData {
 

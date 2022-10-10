@@ -62,7 +62,7 @@ import static org.junit.Assert.assertEquals;
 public class TestImportCnaDiscreteLongData {
     int studyId;
     GeneticProfile geneticProfile;
-    String genePanel = "TESTPANEL_CNA";
+    String genePanel = "TESTPANEL_CNA_DISCRETE_LONG_FORMAT";
 
     @Before
     public void setUp() throws DaoException {
