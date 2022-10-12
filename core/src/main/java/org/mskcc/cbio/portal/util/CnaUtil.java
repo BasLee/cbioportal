@@ -12,7 +12,7 @@ import static org.mskcc.cbio.portal.scripts.ImportTabDelimData.*;
 
 public class CnaUtil {
 
-    private HashMap<String, Integer> columnIndexMap;
+    private final HashMap<String, Integer> columnIndexMap;
 
     public static final String HUGO_SYMBOL = "Hugo_Symbol";
     public static final String ENTREZ_GENE_ID = "Entrez_Gene_Id";
@@ -42,11 +42,8 @@ public class CnaUtil {
 
     public static final String CBP_DRIVER_TIERS_ANNOTATION = "cbp_driver_tiers_annotation";
 
-    public CnaUtil() {
-    }
-
     public CnaUtil(String headerRow) {
-        this.columnIndexMap = new HashMap<String, Integer>();
+        this.columnIndexMap = new HashMap<>();
         String[] headerParts = headerRow.trim().split("\t");
 
         // Find header indices

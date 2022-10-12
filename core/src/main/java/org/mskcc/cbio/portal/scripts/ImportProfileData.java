@@ -126,7 +126,8 @@ public class ImportProfileData extends ConsoleRunnable {
                 if (pdAnnotationsFilename != null && !"".equals(pdAnnotationsFilename)) {
                     importer.setPdAnnotationsFile(new File(dataFile.getParent(), pdAnnotationsFilename));
                 }
-                importer.importData(numLines);            }
+                importer.importData(numLines);            
+            }
        }
        catch (Exception e) {
     	   e.printStackTrace();
