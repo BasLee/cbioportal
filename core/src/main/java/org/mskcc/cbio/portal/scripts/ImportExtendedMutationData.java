@@ -60,8 +60,6 @@ import java.util.regex.*;
  * @author Selcuk Onur Sumer
  */
 
-// TODO: example voor pd en namespaces
-
 public class ImportExtendedMutationData{
     private File mutationFile;
     private int geneticProfileId;

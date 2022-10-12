@@ -44,8 +44,7 @@ import java.util.Set;
  */
 
 public class ImportStructuralVariantData {
-    // TODO alter
-    
+        
     // Initialize variables
     private File structuralVariantFile;
     private int geneticProfileId;

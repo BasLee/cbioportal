@@ -9,7 +9,7 @@ import java.util.HashSet;
 
 import static java.lang.String.format;
 
-public class GeneticAlterationGeneImporter {
+public class GeneticAlterationImporter {
 
     public static class ProfileAndGeneKey {
 
@@ -34,12 +34,18 @@ public class GeneticAlterationGeneImporter {
     }
     
     private final int geneticProfileId;
-    private final HashSet<ProfileAndGeneKey> importSetOfGenes = new HashSet<ProfileAndGeneKey>();
-    private final DaoGeneticAlteration daoGeneticAlteration;
+    private final HashSet<Long> importSetOfGenes = new HashSet<>();
+    private DaoGeneticAlteration daoGeneticAlteration;
 
-    public GeneticAlterationGeneImporter(int geneticProfileId, DaoGeneticAlteration daoGeneticAlteration) {
+    public GeneticAlterationImporter(
+        int geneticProfileId
+    ) {
         this.geneticProfileId = geneticProfileId;
-        this.daoGeneticAlteration = daoGeneticAlteration;
+        try {
+            this.daoGeneticAlteration = DaoGeneticAlteration.getInstance();
+        } catch (DaoException e) {
+            e.printStackTrace();
+        }
     }
     
     /**
@@ -47,20 +53,22 @@ public class GeneticAlterationGeneImporter {
      * This is an important check, because a GISTIC or RAE file may contain
      * multiple rows for the same gene, and we only want to import the first row.
      */
-    public boolean storeGeneticAlterations(
+    public boolean store(
         String[] values,
         CanonicalGene gene,
         String geneSymbol
     ) throws DaoException {
         ProfileAndGeneKey toImport = new ProfileAndGeneKey(geneticProfileId, gene.getEntrezGeneId());
         try {
-            if (!importSetOfGenes.contains(toImport)) {
+            if (!importSetOfGenes.contains(gene.getEntrezGeneId())) {
                 daoGeneticAlteration.addGeneticAlterations(geneticProfileId, gene.getEntrezGeneId(), values);
-                importSetOfGenes.add(toImport);
+                importSetOfGenes.add(gene.getEntrezGeneId());
                 return true;
             } else {
                 String geneSymbolMessage = "";
-                if (geneSymbol != null && !geneSymbol.equalsIgnoreCase(gene.getHugoGeneSymbolAllCaps())) {
+                if (geneSymbol != null 
+                    && !geneSymbol.equalsIgnoreCase(gene.getHugoGeneSymbolAllCaps())
+                ) {
                     geneSymbolMessage = " (given as alias in your file as: " + geneSymbol + ")";
                 }
                 ProgressMonitor.logWarning(format(

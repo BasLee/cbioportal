@@ -52,7 +52,6 @@ import org.mskcc.cbio.portal.util.*;
  */
 public class ImportProfileData extends ConsoleRunnable {
 
-    // TODO alter for CNA
     public void run() {
         try {
             // Parse arguments
