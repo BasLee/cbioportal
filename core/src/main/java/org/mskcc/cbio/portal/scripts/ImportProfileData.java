@@ -131,12 +131,14 @@ public class ImportProfileData extends ConsoleRunnable {
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION 
                 && geneticProfile.getDatatype().equals("DISCRETE_LONG")
             ) {
+                Set<String> namespaces = GeneticProfileReader.getNamespaces(descriptorFile);
                 ImportCnaDiscreteLongData importer = new ImportCnaDiscreteLongData(
                     dataFile, 
                     geneticProfile.getGeneticProfileId(), 
                     genePanel,
                     daoGene,
-                    daoGeneticAlteration
+                    daoGeneticAlteration,
+                    namespaces
                 );
                 importer.importData();
             } else {

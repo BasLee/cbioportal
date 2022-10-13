@@ -421,7 +421,7 @@ public class ImportExtendedMutationData{
                         ascn = new AlleleSpecificCopyNumber(ascnData);
                     }
                     if (record.getNamespacesMap() != null && !record.getNamespacesMap().isEmpty()) {
-                        mutation.setAnnotationJson(convertMapToJsonString(record.getNamespacesMap()));
+                        mutation.setAnnotationJson(this.convertMapToJsonString(record.getNamespacesMap()));
                     }
 
                     sequencedCaseSet.add(sample.getStableId());

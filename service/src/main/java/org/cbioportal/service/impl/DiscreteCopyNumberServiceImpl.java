@@ -1,7 +1,12 @@
 package org.cbioportal.service.impl;
 
-import org.cbioportal.model.*;
+import org.cbioportal.model.CNA;
+import org.cbioportal.model.CopyNumberCount;
+import org.cbioportal.model.CopyNumberCountByGene;
+import org.cbioportal.model.DiscreteCopyNumberData;
 import org.cbioportal.model.GeneFilterQuery;
+import org.cbioportal.model.GeneMolecularData;
+import org.cbioportal.model.MolecularProfile;
 import org.cbioportal.model.meta.BaseMeta;
 import org.cbioportal.persistence.DiscreteCopyNumberRepository;
 import org.cbioportal.service.DiscreteCopyNumberService;
@@ -79,7 +84,7 @@ public class DiscreteCopyNumberServiceImpl implements DiscreteCopyNumberService 
 
         validateMolecularProfile(molecularProfileId);
         if (isHomdelOrAmpOnly(alterationTypes)) {
-            return discreteCopyNumberRepository.fetchDiscreteCopyNumbersInMolecularProfile(molecularProfileId, 
+            return discreteCopyNumberRepository.fetchDiscreteCopyNumbersInMolecularProfile(molecularProfileId,
                 sampleIds, entrezGeneIds, alterationTypes, projection);
         }
 
@@ -101,10 +106,10 @@ public class DiscreteCopyNumberServiceImpl implements DiscreteCopyNumberService 
         }
 
         return molecularDataService.getMolecularDataInMultipleMolecularProfiles(
-            molecularProfileIds,
-            sampleIds,
-            entrezGeneIds,
-            projection)
+                molecularProfileIds,
+                sampleIds,
+                entrezGeneIds,
+                projection)
             .stream()
             .filter(g -> isValidAlteration(alterationTypes, g))
             .map(this::convert)
@@ -120,14 +125,18 @@ public class DiscreteCopyNumberServiceImpl implements DiscreteCopyNumberService 
         List<CNA> cnas = geneQueries.stream().map(q -> q.getAlterations()).flatMap(List::stream).collect(Collectors.toList());
         if (cnas.isEmpty())
             return Collections.emptyList();
-        
+
         if (isHomdelOrAmpOnlyCna(cnas)) {
             return discreteCopyNumberRepository.getDiscreteCopyNumbersInMultipleMolecularProfilesByGeneQueries(molecularProfileIds,
                 sampleIds, geneQueries, projection);
         }
-        
-        return molecularDataService.getMolecularDataInMultipleMolecularProfilesByGeneQueries(molecularProfileIds, sampleIds,
-            geneQueries, projection).stream()
+
+        return molecularDataService.getMolecularDataInMultipleMolecularProfilesByGeneQueries(
+                molecularProfileIds,
+                sampleIds,
+                geneQueries,
+                projection
+            ).stream()
             .map(this::convert)
             .collect(Collectors.toList());
     }
@@ -158,11 +167,11 @@ public class DiscreteCopyNumberServiceImpl implements DiscreteCopyNumberService 
     public List<CopyNumberCountByGene> getSampleCountByGeneAndAlterationAndSampleIds(String molecularProfileId,
                                                                                      List<String> sampleIds,
                                                                                      List<Integer> entrezGeneIds,
-                                                                                     List<Integer> alterations) 
+                                                                                     List<Integer> alterations)
         throws MolecularProfileNotFoundException {
 
         validateMolecularProfile(molecularProfileId);
-        
+
         return discreteCopyNumberRepository
             .getSampleCountByGeneAndAlterationAndSampleIds(molecularProfileId, sampleIds, entrezGeneIds, alterations);
     }
@@ -219,7 +228,7 @@ public class DiscreteCopyNumberServiceImpl implements DiscreteCopyNumberService 
     private boolean isHomdelOrAmpOnly(List<Integer> alterationTypes) {
         return !alterationTypes.contains(-1) && !alterationTypes.contains(0) && !alterationTypes.contains(1);
     }
-    
+
     private boolean isHomdelOrAmpOnlyCna(List<CNA> alterationTypes) {
         return !alterationTypes.contains(CNA.HETLOSS) && !alterationTypes.contains(CNA.DIPLOID) && !alterationTypes.contains(CNA.GAIN);
     }
@@ -240,12 +249,17 @@ public class DiscreteCopyNumberServiceImpl implements DiscreteCopyNumberService 
         MolecularProfile molecularProfile = molecularProfileService.getMolecularProfile(molecularProfileId);
 
         if (!molecularProfile.getMolecularAlterationType()
-            .equals(MolecularProfile.MolecularAlterationType.COPY_NUMBER_ALTERATION) ||
-            !molecularProfile.getDatatype().equals("DISCRETE")) {
-
+            .equals(MolecularProfile.MolecularAlterationType.COPY_NUMBER_ALTERATION)
+            || !isDiscreteCnaDataType(molecularProfile)
+        ) {
             throw new MolecularProfileNotFoundException(molecularProfileId);
         }
 
         return molecularProfile;
     }
+
+    private boolean isDiscreteCnaDataType(MolecularProfile molecularProfile) {
+        return MolecularProfile.CnaDatatype.findByName(molecularProfile.getDatatype()) != null;
+    }
+
 }
